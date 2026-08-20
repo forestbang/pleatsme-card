@@ -77,6 +77,9 @@ button{font-family:inherit}
 .f label{display:block;font-size:11px;color:#777;margin-bottom:5px;letter-spacing:.04em}
 .f input,.f select{width:100%;padding:11px 12px;border:1px solid #ddd;border-radius:9px;font-size:13.5px;background:#fff}
 .f input:focus,.f select:focus{outline:0;border-color:var(--ink)}
+.f input::placeholder{color:#c6c6c6;font-weight:400}
+.f select{appearance:none;background-image:url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' fill='none' stroke='%23999' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+ background-repeat:no-repeat;background-position:right 13px center;background-size:11px;padding-right:34px}
 .f2{display:grid;grid-template-columns:1fr 1fr;gap:11px}
 .hint{font-size:10.5px;color:#aaa;margin-top:4px;line-height:1.5}
 .abtns{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
@@ -408,6 +411,17 @@ function viewMode(id){
 /* ---------- 관리(발급) 화면 ---------- */
 var STAFF=[], editing=null, previewLang="ko", curTab="issue", filter="";
 
+var BU_LIST=[
+ ["영업BU","Sales BU"],
+ ["홈쇼핑BU","Home Shopping BU"],
+ ["온라인BU","Online BU"],
+ ["경영지원BU","Management Support BU"],
+ ["디자인BU","Design BU"],
+ ["상품전략BU","Product Strategy BU"],
+ ["물류운영BU","Logistics BU"],
+ ["중국지사BU","China Office"]
+];
+
 function gate(){
   var app=document.getElementById("app");
   fbGet(P_CFG+"/pwhash").then(function(hash){
@@ -505,33 +519,84 @@ function tabIssue(){
   document.getElementById("pEn").onclick=function(){previewLang="en";drawPreview()};
   drawForm();
 }
+function modeOf(list,curKo,curEn,isEdit,allowNone){
+  for(var i=0;i<list.length;i++) if(list[i][0]===curKo) return String(i);
+  if(curKo||curEn) return "custom";
+  if(isEdit && allowNone) return "none";
+  return "";
+}
+function selBlock(key,label,list,curKo,curEn,mode,noneLabel,hint){
+  var opts='<option value=""'+(mode===""?" selected":"")+'>— 선택하세요 —</option>';
+  for(var i=0;i<list.length;i++)
+    opts+='<option value="'+i+'"'+(mode===String(i)?" selected":"")+'>'+esc(list[i][0])+'  ·  '+esc(list[i][1])+'</option>';
+  if(noneLabel) opts+='<option value="none"'+(mode==="none"?" selected":"")+'>'+esc(noneLabel)+'</option>';
+  opts+='<option value="custom"'+(mode==="custom"?" selected":"")+'>직접 입력</option>';
+  var show=(mode==="custom");
+  return '<div class="f"><label>'+label+'</label><select id="f_'+key+'Sel">'+opts+'</select>'
+    +(hint?'<div class="hint">'+hint+'</div>':'')+'</div>'
+    +'<div class="f2" id="'+key+'Custom" style="'+(show?"":"display:none")+'">'
+    +'<div class="f"><label>'+label+' (한글)</label><input id="f_'+key+'Ko" value="'+esc(show?curKo:"")+'" placeholder="한글로 입력"></div>'
+    +'<div class="f"><label>'+label+' (영문)</label><input id="f_'+key+'En" value="'+esc(show?curEn:"")+'" placeholder="영문으로 입력"></div>'
+    +'</div>';
+}
 function drawForm(){
   var p=editing||{display:"auto"};
+  var dMode=modeOf(BU_LIST,p.deptKo,p.deptEn,!!editing,true);
   document.getElementById("form").innerHTML=
-    '<div class="f"><label>명함 주소 (영문 소문자)</label>'
-    +'<input id="f_id" value="'+esc(p.id||"")+'" placeholder="kjh"'+(editing?' disabled style="background:#f5f5f5;color:#888"':'')+'>'
-    +'<div class="hint">'+(editing?'발급 후에는 바꿀 수 없습니다.':'이 사람 명함의 인터넷 주소가 됩니다. 예: kjh')+'</div></div>'
-   +'<div class="f2">'+fld("nameKo","이름 (한글)",p.nameKo,"김지환")+fld("nameEn","이름 (영문)",p.nameEn,"KIM JI HWAN")+'</div>'
-   +'<div class="f2">'+fld("deptKo","부서 (한글)",p.deptKo,"영업BU")+fld("deptEn","부서 (영문)",p.deptEn,"Sales BU")+'</div>'
-   +'<div class="f2">'+fld("titleKo","직급 (한글)",p.titleKo,"이사")+fld("titleEn","직급 (영문)",p.titleEn,"Director")+'</div>'
+    '<div class="f"><label>명함 주소</label>'
+    +'<input id="f_id" value="'+esc(p.id||"")+'" placeholder="영문 소문자 · 띄어쓰기 없이"'
+      +(editing?' disabled style="background:#f5f5f5;color:#888"':'')+'>'
+    +'<div class="hint">'+(editing?'발급 후에는 바꿀 수 없습니다.'
+      :'이 사람 명함의 인터넷 주소가 됩니다. 이름 이니셜을 쓰시면 편합니다.')+'</div></div>'
+   +'<div class="f2">'
+     +fld("nameKo","이름 (한글)",p.nameKo,"한글 이름")
+     +fld("nameEn","이름 (영문)",p.nameEn,"영문 이름")
+   +'</div>'
+   +'<div class="hint" style="margin:-8px 0 14px">영문 이름은 본인이 쓰는 표기를 그대로 넣으시면 됩니다.</div>'
+   +selBlock("dept","부서",BU_LIST,p.deptKo,p.deptEn,dMode,"소속 없음 (임원)",
+       "임원처럼 BU 소속이 없으면 [소속 없음]을 고르세요. 명함에 직급만 표시됩니다.")
+   +'<div class="f2">'
+     +fld("titleKo","직급 (한글)",p.titleKo,"직급")
+     +fld("titleEn","직급 (영문)",p.titleEn,"영문 직급")
+   +'</div>'
+   +'<div class="hint" style="margin:-8px 0 14px">참고 — 이사 Director · 상무 Managing Director · 부장 General Manager · 팀장 Team Manager · 과장 Manager · 대리 Assistant Manager</div>'
    +fld("mobile","휴대전화",p.mobile,"010-0000-0000","영문 명함에서는 자동으로 +82-10-… 으로 바뀝니다")
-   +fld("email","이메일",p.email,"name@pleatsme.com")
+   +fld("email","이메일",p.email,"@pleatsme.com")
    +'<div class="f"><label>언어 표기</label><select id="f_display">'
    +'<option value="auto"'+(p.display==="auto"?" selected":"")+'>한글+영문 (전환 버튼 표시 · 추천)</option>'
    +'<option value="ko"'+(p.display==="ko"?" selected":"")+'>한글만</option>'
    +'<option value="en"'+(p.display==="en"?" selected":"")+'>영문만</option></select>'
    +'<div class="hint">추천 설정은 상대방 휴대폰 언어에 맞춰 자동으로 열립니다.</div></div>';
+
   ["id","nameKo","nameEn","deptKo","deptEn","titleKo","titleEn","mobile","email"].forEach(function(k){
     var e=document.getElementById("f_"+k); if(e) e.oninput=drawPreview;
   });
+  document.getElementById("f_deptSel").onchange=function(){
+    document.getElementById("deptCustom").style.display=(this.value==="custom")?"":"none";
+    if(this.value==="custom"){ var e=document.getElementById("f_deptKo"); if(e) e.focus(); }
+    drawPreview();
+  };
   document.getElementById("f_display").onchange=drawPreview;
   drawPreview();
 }
+function pickPair(key,list){
+  var s=document.getElementById("f_"+key+"Sel");
+  if(!s) return ["",""];
+  if(s.value==="custom"){
+    var a=document.getElementById("f_"+key+"Ko"), b=document.getElementById("f_"+key+"En");
+    return [a?a.value.trim():"", b?b.value.trim():""];
+  }
+  if(s.value===""||s.value==="none") return ["",""];
+  var i=parseInt(s.value,10);
+  return list[i]?[list[i][0],list[i][1]]:["",""];
+}
 function readForm(){
   function v(k){var e=document.getElementById("f_"+k);return e?e.value.trim():""}
+  var d=pickPair("dept",BU_LIST);
   return {id:(editing?editing.id:v("id").toLowerCase().replace(/[^a-z0-9_-]/g,"")),
-    nameKo:v("nameKo"),nameEn:v("nameEn"),deptKo:v("deptKo"),deptEn:v("deptEn"),
-    titleKo:v("titleKo"),titleEn:v("titleEn"),mobile:v("mobile"),email:v("email"),
+    nameKo:v("nameKo"),nameEn:v("nameEn"),
+    deptKo:d[0],deptEn:d[1],titleKo:v("titleKo"),titleEn:v("titleEn"),
+    mobile:v("mobile"),email:v("email"),
     display:document.getElementById("f_display").value};
 }
 function drawPreview(){
