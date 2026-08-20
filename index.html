@@ -165,11 +165,23 @@ var T = {
   ko:{ mobile:"휴대전화", office:"대표전화", email:"이메일", addr:"주소", web:"홈페이지",
        save:"연락처 저장", call:"전화걸기", mail:"메일보내기", qr:"내 QR 코드",
        qrTitle:"이 화면을 상대방이 찍으면 됩니다", qrSub:"카메라로 QR을 비추면 명함이 열립니다",
-       close:"닫기", notfound:"등록되지 않은 명함입니다." },
+       close:"닫기", notfound:"등록되지 않은 명함입니다.",
+       saveTitle:"연락처 파일을 보냈습니다",
+       saveIos:"화면에 '새로운 연락처' 창이 뜨면 [완료]를 누르세요. 같은 이름이 이미 있으면 [기존 연락처에 통합]을 고르면 됩니다.",
+       saveAnd:"파일이 하나 받아집니다. 화면 위 알림 또는 [다운로드] 폴더에서 그 파일을 한 번 누르면 연락처 앱이 열립니다.",
+       savePc:"다운로드 폴더에 .vcf 파일이 저장됩니다. 두 번 클릭하면 아웃룩·연락처 앱에 들어갑니다.",
+       saveAlt:"창이 안 뜨거나 저장이 안 되면 아래 버튼으로 정보를 복사해 직접 붙여 넣으세요.",
+       copyBtn:"정보 복사하기", copied:"복사했습니다" },
   en:{ mobile:"Mobile", office:"Office", email:"Email", addr:"Address", web:"Website",
        save:"Save Contact", call:"Call", mail:"Email", qr:"My QR Code",
        qrTitle:"Let them scan this", qrSub:"Point a phone camera at the QR code",
-       close:"Close", notfound:"Card not found." }
+       close:"Close", notfound:"Card not found.",
+       saveTitle:"Contact file sent",
+       saveIos:"Tap Done on the New Contact screen. If the name already exists, choose Merge with existing contact.",
+       saveAnd:"A file is downloaded. Tap it in the notification bar or your Downloads folder to open Contacts.",
+       savePc:"A .vcf file is saved to your Downloads folder. Double-click it to add to Outlook or Contacts.",
+       saveAlt:"If nothing opens, copy the details below and paste them in manually.",
+       copyBtn:"Copy details", copied:"Copied" }
 };
 
 var ICON = {
@@ -221,12 +233,46 @@ function vcard(p, lang){
 }
 function downloadVcf(p, lang){
   var txt = vcard(p, lang);
-  var blob = new Blob(["﻿"+txt], {type:"text/vcard;charset=utf-8"});
+  var blob = new Blob([txt], {type:"text/vcard;charset=utf-8"});
   var url = URL.createObjectURL(blob);
   var a = document.createElement("a");
-  a.href = url; a.download = (p.nameEn||p.id).replace(/\s+/g,"_")+".vcf";
+  a.href = url; a.download = (p.nameEn||p.nameKo||p.id).replace(/\s+/g,"_")+".vcf";
+  a.rel = "noopener";
   document.body.appendChild(a); a.click();
-  setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 800);
+  setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 4000);
+}
+function platform(){
+  var ua = navigator.userAgent || "";
+  if(/iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)) return "ios";
+  if(/Android/i.test(ua)) return "android";
+  return "pc";
+}
+function plainText(p, lang){
+  var isEn = lang === "en";
+  var L = [];
+  L.push(isEn ? (p.nameEn||p.nameKo) : (p.nameKo||p.nameEn));
+  var d = isEn ? (p.deptEn||p.deptKo) : (p.deptKo||p.deptEn);
+  var t = isEn ? (p.titleEn||p.titleKo) : (p.titleKo||p.titleEn);
+  L.push([isEn ? COMPANY.nameEn : COMPANY.nameKo, d, t].filter(Boolean).join(" / "));
+  if(p.mobile) L.push("M. " + (isEn ? intl(p.mobile) : p.mobile));
+  if(COMPANY.office) L.push("T. " + (isEn ? (COMPANY.officeIntl||COMPANY.office) : COMPANY.office));
+  if(p.email) L.push("E. " + p.email);
+  L.push(isEn ? COMPANY.addrEn : COMPANY.addrKo);
+  L.push(COMPANY.web);
+  return L.join("\n");
+}
+function copyText(txt, btn, doneLabel){
+  function flash(){ var o = btn.textContent; btn.textContent = doneLabel; setTimeout(function(){ btn.textContent = o; }, 1600); }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(flash, function(){ legacy(); });
+  } else { legacy(); }
+  function legacy(){
+    var ta = document.createElement("textarea");
+    ta.value = txt; ta.style.position="fixed"; ta.style.opacity="0";
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand("copy"); flash(); }catch(e){ alert(txt); }
+    document.body.removeChild(ta);
+  }
 }
 
 /* ---------- 명함 그리기 ---------- */
@@ -344,15 +390,35 @@ function viewMode(id){
   document.documentElement.lang = lang;
   paint();
   function paint(){
+    var t = T[lang];
+    var pf = platform();
+    var howto = pf==="ios" ? t.saveIos : pf==="android" ? t.saveAnd : t.savePc;
     app.innerHTML = renderCard(p, lang) +
       '<div class="modal" id="qrModal"><div class="mcard">'+
-      '<h4>'+T[lang].qrTitle+'</h4><p>'+T[lang].qrSub+'</p>'+
+      '<h4>'+t.qrTitle+'</h4><p>'+t.qrSub+'</p>'+
       '<div class="qrbox" id="qrbox"></div>'+
-      '<button class="mclose" id="mclose">'+T[lang].close+'</button></div></div>';
+      '<button class="mclose" id="mclose">'+t.close+'</button></div></div>'+
+      '<div class="modal" id="saveModal"><div class="mcard" style="text-align:left">'+
+      '<h4 style="text-align:center;margin-bottom:12px">'+t.saveTitle+'</h4>'+
+      '<p style="text-align:left;line-height:1.7;margin-bottom:14px">'+howto+'</p>'+
+      '<p style="text-align:left;line-height:1.7;color:#999;margin-bottom:14px">'+t.saveAlt+'</p>'+
+      '<pre id="plainBox" style="background:#fafafa;border:1px solid #eee;border-radius:9px;padding:12px;'+
+        'font-size:11.5px;line-height:1.65;white-space:pre-wrap;word-break:break-all;margin:0 0 12px;'+
+        'font-family:inherit;color:#444">'+esc(plainText(p, lang))+'</pre>'+
+      '<button class="mclose" id="btnCopy" style="margin-top:0;background:#111;color:#fff;border-color:#111">'+t.copyBtn+'</button>'+
+      '<button class="mclose" id="sclose">'+t.close+'</button></div></div>';
     var tg = app.querySelectorAll(".langtoggle button");
     for(var i=0;i<tg.length;i++){ tg[i].onclick = function(){
       lang = this.getAttribute("data-lang"); document.documentElement.lang=lang; paint(); }; }
-    document.getElementById("btnSave").onclick = function(){ downloadVcf(p, lang); };
+    document.getElementById("btnSave").onclick = function(){
+      downloadVcf(p, lang);
+      setTimeout(function(){ document.getElementById("saveModal").classList.add("on"); }, 700);
+    };
+    document.getElementById("btnCopy").onclick = function(){
+      copyText(plainText(p, lang), this, T[lang].copied);
+    };
+    document.getElementById("sclose").onclick = function(){ document.getElementById("saveModal").classList.remove("on"); };
+    document.getElementById("saveModal").onclick = function(e){ if(e.target===this) this.classList.remove("on"); };
     var bq = document.getElementById("btnQr");
     if(bq) bq.onclick = function(){
       var m=document.getElementById("qrModal"); m.classList.add("on");
