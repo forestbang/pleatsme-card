@@ -465,6 +465,7 @@ var C_LEVELS=[
  ["CIO","Chief Information Officer"],
  ["CTO","Chief Technology Officer"]
 ];
+var BUILD="2026-08-21 · 온라인스토어판";
 var EMAIL_DOMAIN="pleatsme.com";
 
 /* Firebase 키·주소에 못 쓰는 글자 정리 */
@@ -548,7 +549,7 @@ function adminMode(){
 function drawAdmin(){
   document.getElementById("app").innerHTML=
    '<div class="adm">'
-   +'<div class="top"><h1>PLEATSME 전자명함 발급</h1><span class="tag">경영지원BU</span></div>'
+   +'<div class="top"><h1>PLEATSME 전자명함 발급</h1><span class="tag">경영지원BU</span>'+'<span style="font-size:10.5px;color:#bbb;letter-spacing:.03em">버전 '+BUILD+'</span></div>'
    +'<p class="desc">직원 정보를 넣고 [명함 발급]을 누르면 그 자리에서 QR과 명함 주소가 만들어집니다. GitHub에 다시 올릴 필요가 없습니다.</p>'
    +'<div class="tabs">'
    + '<button data-tab="issue" class="'+(curTab==="issue"?"on":"")+'">명함 발급</button>'
