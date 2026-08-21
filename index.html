@@ -411,6 +411,22 @@ function viewMode(id){
 /* ---------- 관리(발급) 화면 ---------- */
 var STAFF=[], editing=null, previewLang="ko", curTab="issue", filter="";
 
+var TITLE_LIST=[
+ ["사원","Associate"],
+ ["전임","Staff"],
+ ["선임","Senior Staff"],
+ ["대리","Assistant Manager"],
+ ["과장","Manager"],
+ ["차장","Deputy General Manager"],
+ ["부장","General Manager"],
+ ["이사","Director"],
+ ["상무","Managing Director"],
+ ["전무","Senior Managing Director"],
+ ["부사장","Executive Vice President"],
+ ["사장","President"],
+ ["회장","Chairman"]
+];
+var EMAIL_DOMAIN="pleatsme.com";
 var BU_LIST=[
  ["영업BU","Sales BU"],
  ["홈쇼핑BU","Home Shopping BU"],
@@ -539,9 +555,24 @@ function selBlock(key,label,list,curKo,curEn,mode,noneLabel,hint){
     +'<div class="f"><label>'+label+' (영문)</label><input id="f_'+key+'En" value="'+esc(show?curEn:"")+'" placeholder="영문으로 입력"></div>'
     +'</div>';
 }
+function splitMobile(v){
+  var d=String(v||"").replace(/[^0-9]/g,"");
+  if(!d) return ["010","",""];
+  if(d.length<=3) return [d,"",""];
+  if(d.length<=7) return [d.slice(0,3),d.slice(3),""];
+  return [d.slice(0,3), d.slice(3,d.length-4), d.slice(-4)];
+}
+function splitEmail(v){
+  var s=String(v||"");
+  var i=s.indexOf("@");
+  if(i<0) return [s, EMAIL_DOMAIN];
+  return [s.slice(0,i), s.slice(i+1)||EMAIL_DOMAIN];
+}
 function drawForm(){
   var p=editing||{display:"auto"};
+  var mb=splitMobile(p.mobile), em=splitEmail(p.email);
   var dMode=modeOf(BU_LIST,p.deptKo,p.deptEn,!!editing,true);
+  var tMode=modeOf(TITLE_LIST,p.titleKo,p.titleEn,!!editing,false);
   document.getElementById("form").innerHTML=
     '<div class="f"><label>명함 주소</label>'
     +'<input id="f_id" value="'+esc(p.id||"")+'" placeholder="영문 소문자 · 띄어쓰기 없이"'
@@ -555,27 +586,50 @@ function drawForm(){
    +'<div class="hint" style="margin:-8px 0 14px">영문 이름은 본인이 쓰는 표기를 그대로 넣으시면 됩니다.</div>'
    +selBlock("dept","부서",BU_LIST,p.deptKo,p.deptEn,dMode,"소속 없음 (임원)",
        "임원처럼 BU 소속이 없으면 [소속 없음]을 고르세요. 명함에 직급만 표시됩니다.")
-   +'<div class="f2">'
-     +fld("titleKo","직급 (한글)",p.titleKo,"직급")
-     +fld("titleEn","직급 (영문)",p.titleEn,"영문 직급")
-   +'</div>'
-   +'<div class="hint" style="margin:-8px 0 14px">참고 — 이사 Director · 상무 Managing Director · 부장 General Manager · 팀장 Team Manager · 과장 Manager · 대리 Assistant Manager</div>'
-   +fld("mobile","휴대전화",p.mobile,"010-0000-0000","영문 명함에서는 자동으로 +82-10-… 으로 바뀝니다")
-   +fld("email","이메일",p.email,"@pleatsme.com")
+   +selBlock("title","직급",TITLE_LIST,p.titleKo,p.titleEn,tMode,"",
+       "고르면 영문 직급이 자동으로 정해집니다. 목록에 없으면 [직접 입력]을 고르세요.")
+   +'<div class="f"><label>휴대전화</label>'
+     +'<div style="display:flex;gap:7px;align-items:center">'
+       +'<input id="f_mobile1" value="'+esc(mb[0])+'" maxlength="3" inputmode="numeric" style="width:74px;text-align:center">'
+       +'<span style="color:#ccc">-</span>'
+       +'<input id="f_mobile2" value="'+esc(mb[1])+'" maxlength="4" inputmode="numeric" placeholder="0000" style="text-align:center">'
+       +'<span style="color:#ccc">-</span>'
+       +'<input id="f_mobile3" value="'+esc(mb[2])+'" maxlength="4" inputmode="numeric" placeholder="0000" style="text-align:center">'
+     +'</div><div class="hint">영문 명함에서는 자동으로 +82-10-… 으로 바뀝니다</div></div>'
+   +'<div class="f"><label>이메일</label>'
+     +'<div style="display:flex;gap:7px;align-items:center">'
+       +'<input id="f_emailId" value="'+esc(em[0])+'" placeholder="아이디" style="flex:1">'
+       +'<span style="color:#aaa">@</span>'
+       +'<input id="f_emailDom" value="'+esc(em[1])+'" style="width:158px">'
+     +'</div><div class="hint">도메인이 다르면 오른쪽 칸만 고치시면 됩니다</div></div>'
    +'<div class="f"><label>언어 표기</label><select id="f_display">'
    +'<option value="auto"'+(p.display==="auto"?" selected":"")+'>한글+영문 (전환 버튼 표시 · 추천)</option>'
    +'<option value="ko"'+(p.display==="ko"?" selected":"")+'>한글만</option>'
    +'<option value="en"'+(p.display==="en"?" selected":"")+'>영문만</option></select>'
    +'<div class="hint">추천 설정은 상대방 휴대폰 언어에 맞춰 자동으로 열립니다.</div></div>';
 
-  ["id","nameKo","nameEn","deptKo","deptEn","titleKo","titleEn","mobile","email"].forEach(function(k){
+  ["id","nameKo","nameEn","deptKo","deptEn","titleKo","titleEn",
+   "mobile1","mobile2","mobile3","emailId","emailDom"].forEach(function(k){
     var e=document.getElementById("f_"+k); if(e) e.oninput=drawPreview;
   });
-  document.getElementById("f_deptSel").onchange=function(){
-    document.getElementById("deptCustom").style.display=(this.value==="custom")?"":"none";
-    if(this.value==="custom"){ var e=document.getElementById("f_deptKo"); if(e) e.focus(); }
-    drawPreview();
-  };
+  ["mobile1","mobile2","mobile3"].forEach(function(k,i){
+    var e=document.getElementById("f_"+k);
+    e.addEventListener("input",function(){
+      this.value=this.value.replace(/[^0-9]/g,"");
+      var max=(i===0)?3:4;
+      if(this.value.length>=max && i<2){
+        var nx=document.getElementById("f_mobile"+(i+2)); if(nx) nx.focus();
+      }
+      drawPreview();
+    });
+  });
+  ["dept","title"].forEach(function(k){
+    document.getElementById("f_"+k+"Sel").onchange=function(){
+      document.getElementById(k+"Custom").style.display=(this.value==="custom")?"":"none";
+      if(this.value==="custom"){ var e=document.getElementById("f_"+k+"Ko"); if(e) e.focus(); }
+      drawPreview();
+    };
+  });
   document.getElementById("f_display").onchange=drawPreview;
   drawPreview();
 }
@@ -592,11 +646,14 @@ function pickPair(key,list){
 }
 function readForm(){
   function v(k){var e=document.getElementById("f_"+k);return e?e.value.trim():""}
-  var d=pickPair("dept",BU_LIST);
+  var d=pickPair("dept",BU_LIST), t=pickPair("title",TITLE_LIST);
+  var m1=v("mobile1"),m2=v("mobile2"),m3=v("mobile3");
+  var mobile=(m2&&m3)?[m1||"010",m2,m3].join("-"):"";
+  var eid=v("emailId"), edm=v("emailDom")||EMAIL_DOMAIN;
   return {id:(editing?editing.id:v("id").toLowerCase().replace(/[^a-z0-9_-]/g,"")),
     nameKo:v("nameKo"),nameEn:v("nameEn"),
-    deptKo:d[0],deptEn:d[1],titleKo:v("titleKo"),titleEn:v("titleEn"),
-    mobile:v("mobile"),email:v("email"),
+    deptKo:d[0],deptEn:d[1],titleKo:t[0],titleEn:t[1],
+    mobile:mobile, email:eid?(eid+"@"+edm):"",
     display:document.getElementById("f_display").value};
 }
 function drawPreview(){
