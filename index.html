@@ -442,6 +442,45 @@ var C_LEVELS=[
  ["CTO","Chief Technology Officer"]
 ];
 var EMAIL_DOMAIN="pleatsme.com";
+
+/* 한글 이름 → 영문 주소 변환 */
+var CHO=['g','kk','n','d','tt','r','m','b','pp','s','ss','','j','jj','ch','k','t','p','h'];
+var JUNG=['a','ae','ya','yae','eo','e','yeo','ye','o','wa','wae','oe','yo','u','wo','we','wi','yu','eu','ui','i'];
+var JONG=['','k','k','k','n','n','n','t','l','k','m','l','l','l','p','l','m','p','p','t','t','ng','t','t','k','t','p','t'];
+var SURNAME={"김":"kim","이":"lee","박":"park","최":"choi","정":"jung","강":"kang","조":"cho","윤":"yoon",
+ "장":"jang","임":"lim","한":"han","오":"oh","서":"seo","신":"shin","권":"kwon","황":"hwang","안":"ahn",
+ "송":"song","류":"ryu","유":"yoo","홍":"hong","전":"jeon","고":"ko","문":"moon","손":"son","양":"yang",
+ "배":"bae","백":"baek","허":"heo","남":"nam","심":"shim","노":"noh","하":"ha","곽":"kwak","성":"sung",
+ "차":"cha","주":"joo","우":"woo","구":"koo","방":"bang","원":"won","천":"chun","지":"ji","엄":"um",
+ "채":"chae","소":"so","연":"yeon","라":"ra","마":"ma","진":"jin","여":"yeo","추":"chu","변":"byun",
+ "염":"yeom","석":"seok","선":"sun","설":"seol","마":"ma","길":"gil","위":"wi","표":"pyo","명":"myung",
+ "기":"ki","반":"ban","왕":"wang","금":"keum","옥":"ok","육":"yook","인":"in","맹":"maeng","제":"je",
+ "탁":"tak","국":"kook","여":"yeo","은":"eun","편":"pyun","용":"yong","예":"ye","봉":"bong","한":"han"};
+function romanizeKo(txt){
+  var out="";
+  var s=String(txt||"").replace(/\s+/g,"");
+  for(var i=0;i<s.length;i++){
+    var ch=s[i], code=ch.charCodeAt(0);
+    if(i===0 && SURNAME[ch]){ out+=SURNAME[ch]; continue; }
+    if(code>=0xAC00 && code<=0xD7A3){
+      var v=code-0xAC00;
+      out+=CHO[Math.floor(v/588)]+JUNG[Math.floor((v%588)/28)]+JONG[v%28];
+    } else if(/[a-zA-Z0-9]/.test(ch)) out+=ch.toLowerCase();
+  }
+  return out.replace(/hui/g,"hee");
+}
+function slugFrom(nameEn,nameKo){
+  var s=String(nameEn||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+  if(!s) s=romanizeKo(nameKo);
+  return s.slice(0,22);
+}
+function uniqueId(base){
+  if(!base) return "";
+  var ids=STAFF.map(function(s){return s.id});
+  if(ids.indexOf(base)<0) return base;
+  var n=2; while(ids.indexOf(base+n)>=0) n++;
+  return base+n;
+}
 var BU_LIST=[
  ["영업BU","Sales BU"],
  ["홈쇼핑BU","Home Shopping BU"],
@@ -516,9 +555,12 @@ function drawAdmin(){
    +'<div id="tabbody"></div>'
    +'<div class="modal" id="resModal"><div class="mcard"><h4 id="resName"></h4>'
    +'<p id="resSub">명함이 발급되었습니다</p><div class="qrbox" id="resQr"></div>'
-   +'<div class="urlbox" id="resUrl" style="margin-top:16px"></div>'
+   +'<div class="note" style="margin-top:16px;text-align:left"><b>직원에게 전달하는 방법</b><br>'
+   +'1. 아래 [QR 이미지 저장]을 눌러 이미지를 받습니다<br>'
+   +'2. 카톡·메일에 <b>그 이미지를 첨부</b>해 본인에게 보냅니다<br>'
+   +'3. 안내 문구가 필요하면 [안내 문구 복사]를 함께 쓰세요</div>'
    +'<button class="mclose" id="resDl" style="background:#111;color:#fff;border-color:#111;margin-top:14px">QR 이미지 저장</button>'
-   +'<button class="mclose" id="resCopy">직원에게 보낼 문구 복사</button>'
+   +'<button class="mclose" id="resCopy">안내 문구 복사</button>'
    +'<button class="mclose" id="resClose">닫기</button></div></div></div>';
   var tb=document.querySelectorAll(".tabs button");
   for(var i=0;i<tb.length;i++) tb[i].onclick=function(){curTab=this.getAttribute("data-tab");drawAdmin()};
@@ -595,16 +637,18 @@ function drawForm(){
     cOpts+='<option value="'+C_LEVELS[ci2][0]+'"'+(curC===C_LEVELS[ci2][0]?" selected":"")+'>'
       +C_LEVELS[ci2][0]+'  ·  '+C_LEVELS[ci2][1]+'</option>';
   document.getElementById("form").innerHTML=
-    '<div class="f"><label>명함 주소</label>'
-    +'<input id="f_id" value="'+esc(p.id||"")+'" placeholder="영문 소문자 · 띄어쓰기 없이"'
-      +(editing?' disabled style="background:#f5f5f5;color:#888"':'')+'>'
-    +'<div class="hint">'+(editing?'발급 후에는 바꿀 수 없습니다.'
-      :'이 사람 명함의 인터넷 주소가 됩니다. 이름 이니셜을 쓰시면 편합니다.')+'</div></div>'
-   +'<div class="f2">'
+    '<div class="f2">'
      +fld("nameKo","이름 (한글)",p.nameKo,"한글 이름")
      +fld("nameEn","이름 (영문)",p.nameEn,"영문 이름")
    +'</div>'
    +'<div class="hint" style="margin:-8px 0 14px">영문 이름은 본인이 쓰는 표기를 그대로 넣으시면 됩니다.</div>'
+   +'<div class="f"><label>명함 주소 (이름에서 자동으로 만들어집니다)</label>'
+     +'<div style="display:flex;gap:8px;align-items:center">'
+       +'<input id="f_id" value="'+esc(p.id||"")+'" readonly '
+         +'style="flex:1;background:#f7f7f7;color:#555'+(editing?';color:#999':'')+'">'
+       +(editing?'':'<button type="button" class="mini" id="idEdit">직접 정하기</button>')
+     +'</div><div class="hint" id="idHint">'
+     +(editing?'발급 후에는 바꿀 수 없습니다.':'이름을 넣으면 자동으로 채워집니다.')+'</div></div>'
    +selBlock("dept","부서",BU_LIST,p.deptKo,p.deptEn,dMode,"소속 없음 (임원)",
        "임원처럼 BU 소속이 없으면 [소속 없음]을 고르세요. 명함에 직급만 표시됩니다.")
    +selBlock("title","직급",TITLE_LIST,p.titleKo,p.titleEn,tMode,"",
@@ -638,6 +682,22 @@ function drawForm(){
    "mobile1","mobile2","mobile3","emailId","emailDom"].forEach(function(k){
     var e=document.getElementById("f_"+k); if(e) e.oninput=drawPreview;
   });
+  if(!editing){
+    idManual=false;
+    ["nameKo","nameEn"].forEach(function(k){
+      document.getElementById("f_"+k).addEventListener("input", syncId);
+    });
+    document.getElementById("idEdit").onclick=function(){
+      idManual=true;
+      var e=document.getElementById("f_id");
+      e.readOnly=false; e.style.background="#fff"; e.style.color="#111";
+      e.placeholder="영문 소문자 · 띄어쓰기 없이"; e.focus();
+      this.style.display="none";
+      document.getElementById("idHint").textContent="영문 소문자·숫자만 쓸 수 있습니다.";
+      e.oninput=function(){ this.value=this.value.toLowerCase().replace(/[^a-z0-9_-]/g,""); drawPreview(); };
+    };
+    syncId();
+  }
   ["mobile1","mobile2","mobile3"].forEach(function(k,i){
     var e=document.getElementById("f_"+k);
     e.addEventListener("input",function(){
@@ -667,6 +727,20 @@ function drawForm(){
     if(!show) document.getElementById("f_clevel").value="";
   }
   document.getElementById("f_display").onchange=drawPreview;
+  drawPreview();
+}
+var idManual=false;
+function syncId(){
+  if(editing||idManual) return;
+  var ko=document.getElementById("f_nameKo").value.trim();
+  var en=document.getElementById("f_nameEn").value.trim();
+  var base=slugFrom(en,ko);
+  var id=uniqueId(base);
+  document.getElementById("f_id").value=id;
+  var h=document.getElementById("idHint");
+  if(!base) h.textContent="이름을 넣으면 자동으로 채워집니다.";
+  else if(id!==base) h.innerHTML='같은 이름이 이미 있어 <b>'+esc(id)+'</b> 로 정했습니다. 이 값이 QR에 들어갑니다.';
+  else h.textContent="이 값이 QR에 들어갑니다. 발급 후에는 바꿀 수 없습니다.";
   drawPreview();
 }
 function pickPair(key,list){
@@ -703,7 +777,8 @@ function drawPreview(){
   for(var i=0;i<tg.length;i++) tg[i].onclick=function(){previewLang=this.getAttribute("data-lang");drawPreview()};
   var bs=document.querySelector("#preview #btnSave"); if(bs) bs.onclick=function(){downloadVcf(p,lang)};
   document.getElementById("urlbox").innerHTML=p.id
-    ?'명함 주소 : <b>'+esc(cardUrl(p.id))+'</b>':'명함 주소(영문 소문자)를 입력하면 주소가 표시됩니다.';
+    ?'발급하면 이 이름으로 QR이 만들어집니다 : <b>'+esc(p.id)+'</b>'
+    :'이름을 넣으면 명함 주소가 자동으로 정해집니다.';
 }
 function issueCard(){
   var p=readForm();
@@ -730,13 +805,15 @@ function showResult(p,isNew){
   var m=document.getElementById("resModal");
   document.getElementById("resName").textContent=(p.nameKo||p.nameEn)+" 님";
   document.getElementById("resSub").textContent=isNew?"명함이 발급되었습니다":"수정 내용이 반영되었습니다";
-  document.getElementById("resUrl").innerHTML=esc(cardUrl(p.id));
   makeQr(document.getElementById("resQr"),cardUrl(p.id),424);
   document.getElementById("resDl").onclick=function(){downloadQr(p)};
   document.getElementById("resCopy").onclick=function(){
-    var msg=(p.nameKo||p.nameEn)+" 님 전자명함입니다.\n"+cardUrl(p.id)
-      +"\n\n· 휴대폰에서 링크를 열면 명함이 뜹니다.\n· [연락처 저장]을 누르면 상대방 주소록에 바로 들어갑니다.\n"
-      +"· 종이명함에 넣을 QR 이미지는 경영지원BU에 요청하세요.";
+    var msg=(p.nameKo||p.nameEn)+" 님 전자명함 QR입니다.\n\n"
+      +"· 첨부된 QR 이미지를 휴대폰 사진첩에 저장해 두세요.\n"
+      +"· 상대방이 이 QR을 찍으면 명함이 열립니다.\n"
+      +"· 상대방이 [연락처 저장]을 누르면 주소록에 바로 들어갑니다.\n"
+      +"· 외국인이 찍으면 영문 명함으로 열립니다.\n"
+      +"· 종이명함에 넣으실 분은 이 이미지를 인쇄 업체에 함께 보내시면 됩니다.";
     copyText(msg,this,"복사했습니다");
   };
   m.classList.add("on");
