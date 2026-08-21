@@ -45,6 +45,16 @@ button{font-family:inherit}
 .btn.solid{background:var(--ink);color:#fff}
 .btn.full{grid-column:1/-1}
 .btn:active{transform:scale(.985)}
+.shop{padding:26px 34px 4px;margin-top:16px;border-top:1px solid var(--line)}
+.shoplab{font-size:9.5px;color:#adadad;letter-spacing:.16em;text-transform:uppercase;text-align:center;margin-bottom:14px}
+.shopgrid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.shopgrid:has(> :only-child){grid-template-columns:1fr}
+.shopbtn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+ border:1px solid var(--line);border-radius:12px;padding:18px 10px;transition:.15s;background:#fff}
+.shopbtn:active{transform:scale(.985);border-color:#bbb}
+.shopbtn img{height:15px;opacity:.9}
+.shopbtn img.lap{height:13px}
+.shopbtn span{font-size:10px;color:#a0a0a0;letter-spacing:.02em;word-break:break-all;text-align:center}
 .foot{padding:26px 34px 46px;text-align:center;border-top:1px solid var(--line);margin-top:24px}
 .foot .co{font-size:12.5px;letter-spacing:.05em;font-weight:600}
 .foot .ad{margin-top:8px;font-size:11.5px;color:var(--sub);line-height:1.65}
@@ -135,7 +145,9 @@ var DEFAULT_COMPANY = {
   addrKo:"서울시 동대문구 장한로2길 41 대일빌딩 3층",
   addrEn:"3F, Daeil Bldg., 41 Janghan-ro 2-gil, Dongdaemun-gu, Seoul 02644, Korea",
   office:"1544-9120", officeIntl:"+82-2-1544-9120",
-  web:"https://www.pleatsme.com"
+  web:"https://www.pleatsme.com",
+  shopPleatsme:"https://www.pleatsme.com",
+  shopLapli:"https://www.la-pli.com"
 };
 var COMPANY = JSON.parse(JSON.stringify(DEFAULT_COMPANY));
 
@@ -154,7 +166,7 @@ var T = {
    saveAnd:"파일이 하나 받아집니다. 화면 위 알림 또는 [다운로드] 폴더에서 그 파일을 한 번 누르면 연락처 앱이 열립니다.",
    savePc:"다운로드 폴더에 .vcf 파일이 저장됩니다. 두 번 클릭하면 아웃룩·연락처 앱에 들어갑니다.",
    saveAlt:"창이 안 뜨거나 저장이 안 되면 아래 버튼으로 정보를 복사해 직접 붙여 넣으세요.",
-   copyBtn:"정보 복사하기",copied:"복사했습니다"},
+   copyBtn:"정보 복사하기",copied:"복사했습니다",shop:"온라인 스토어"},
  en:{mobile:"Mobile",office:"Office",email:"Email",addr:"Address",web:"Website",
    save:"Save Contact",call:"Call",mail:"Email",qr:"Show QR Code",
    qrTitle:"Let them scan this",qrSub:"Point a phone camera at the QR code",close:"Close",
@@ -163,7 +175,7 @@ var T = {
    saveAnd:"A file is downloaded. Tap it in the notification bar or your Downloads folder to open Contacts.",
    savePc:"A .vcf file is saved to your Downloads folder. Double-click it to add to Outlook or Contacts.",
    saveAlt:"If nothing opens, copy the details below and paste them in manually.",
-   copyBtn:"Copy details",copied:"Copied"}
+   copyBtn:"Copy details",copied:"Copied",shop:"Online Store"}
 };
 
 var ICON = {
@@ -239,8 +251,9 @@ function vcard(p,lang){
   if(COMPANY.office) L.push("TEL;TYPE=WORK,VOICE:"+off);
   if(p.email) L.push("EMAIL;TYPE=WORK,INTERNET:"+p.email);
   L.push("ADR;TYPE=WORK:;;"+addr+";;;;");
-  if(COMPANY.web) L.push("URL:"+COMPANY.web);
-  L.push("NOTE:PLEATSME / LAPLI");
+  if(COMPANY.shopPleatsme) L.push("URL;TYPE=Pleatsme:"+COMPANY.shopPleatsme);
+  if(COMPANY.shopLapli) L.push("URL;TYPE=LAPLI:"+COMPANY.shopLapli);
+  L.push("NOTE:PLEATSME · LAPLI");
   L.push("END:VCARD");
   return L.join("\r\n");
 }
@@ -262,7 +275,8 @@ function plainText(p,lang){
   if(COMPANY.office) L.push("T. "+(isEn?(COMPANY.officeIntl||COMPANY.office):COMPANY.office));
   if(p.email) L.push("E. "+p.email);
   L.push(isEn?COMPANY.addrEn:COMPANY.addrKo);
-  L.push(COMPANY.web);
+  if(COMPANY.shopPleatsme) L.push("Pleatsme  "+COMPANY.shopPleatsme.replace(/^https?:\/\//,""));
+  if(COMPANY.shopLapli) L.push("LAPLI  "+COMPANY.shopLapli.replace(/^https?:\/\//,""));
   return L.join("\n");
 }
 function copyText(txt,btn,doneLabel){
@@ -340,14 +354,24 @@ function renderCard(p,lang,opt){
   if(p.email) h+=row(ICON.mail,t.email,esc(p.email),"mailto:"+p.email);
   h += row(ICON.pin,t.addr,'<span class="small">'+esc(addr)+'</span>',
         "https://maps.google.com/?q="+encodeURIComponent(COMPANY.addrEn));
-  h += row(ICON.globe,t.web,esc(COMPANY.web.replace(/^https?:\/\//,"")),COMPANY.web);
   h += '</div>';
   h += '<div class="acts"><button class="btn solid full" id="btnSave">'+ICON.down+'<span>'+t.save+'</span></button>'
      + '<a class="btn" href="tel:'+intl(p.mobile)+'"><span>'+t.call+'</span></a>'
      + '<a class="btn" href="mailto:'+esc(p.email)+'"><span>'+t.mail+'</span></a>'
      + (opt.noQr?'':'<button class="btn full" id="btnQr">'+ICON.qr+'<span>'+t.qr+'</span></button>')+'</div>';
-  h += '<div class="foot"><div class="co">'+esc(co)+'</div><div class="ad">'+esc(addr)+'</div>'
-     + '<a class="wb" href="'+COMPANY.web+'" target="_blank">'+COMPANY.web.replace(/^https?:\/\//,"")+'</a></div>';
+  if(COMPANY.shopPleatsme || COMPANY.shopLapli){
+    h += '<div class="shop"><div class="shoplab">'+t.shop+'</div><div class="shopgrid">';
+    if(COMPANY.shopPleatsme)
+      h += '<a class="shopbtn" href="'+esc(COMPANY.shopPleatsme)+'" target="_blank" rel="noopener">'
+         + '<img src="'+LOGO.pleatsme+'" alt="Pleatsme"><span>'
+         + esc(COMPANY.shopPleatsme.replace(/^https?:\/\//,"").replace(/\/$/,""))+'</span></a>';
+    if(COMPANY.shopLapli)
+      h += '<a class="shopbtn" href="'+esc(COMPANY.shopLapli)+'" target="_blank" rel="noopener">'
+         + '<img class="lap" src="'+LOGO.lapli+'" alt="LAPLI"><span>'
+         + esc(COMPANY.shopLapli.replace(/^https?:\/\//,"").replace(/\/$/,""))+'</span></a>';
+    h += '</div></div>';
+  }
+  h += '<div class="foot"><div class="co">'+esc(co)+'</div><div class="ad">'+esc(addr)+'</div></div>';
   return h+'</div>';
 }
 function row(icon,lab,val,href){
@@ -859,7 +883,7 @@ function tabSet(){
    +fld("caddrKo","주소 (한글)",c.addrKo)
    +fld("caddrEn","주소 (영문)",c.addrEn)
    +'<div class="f2">'+fld("coffice","대표전화 (한글 표기)",c.office)+fld("cofficeIntl","대표전화 (영문 표기)",c.officeIntl)+'</div>'
-   +fld("cweb","홈페이지",c.web,"https://www.pleatsme.com")
+   +'<div class="f2">'+fld("cshop1","Pleatsme 온라인 스토어",c.shopPleatsme,"https://www.pleatsme.com")+fld("cshop2","LAPLI 온라인 스토어",c.shopLapli,"https://www.la-pli.com")+'</div>'   +'<div class="hint" style="margin:-8px 0 14px">명함 아래쪽 [온라인 스토어] 칸에 표시됩니다. 비워두면 그 브랜드는 표시되지 않습니다.</div>'
    +'<div class="abtns"><button class="abtn solid" id="bSaveCo">회사 정보 저장</button></div></div>'
    +'<div class="panel" style="margin-top:18px"><h3>암호 변경</h3>'
    +'<div class="f"><label>새 암호 (4자 이상)</label><input type="password" id="np1"></div>'
@@ -872,7 +896,8 @@ function tabSet(){
   document.getElementById("bSaveCo").onclick=function(){
     function v(k){return document.getElementById("f_"+k).value.trim()}
     var co={nameKo:v("cnameKo"),nameEn:v("cnameEn"),addrKo:v("caddrKo"),addrEn:v("caddrEn"),
-      office:v("coffice"),officeIntl:v("cofficeIntl"),web:v("cweb")};
+      office:v("coffice"),officeIntl:v("cofficeIntl"),web:v("cshop1"),
+      shopPleatsme:v("cshop1"),shopLapli:v("cshop2")};
     var b=this; b.disabled=true; b.textContent="저장 중…";
     fbPut(P_CFG+"/company",co).then(function(){
       COMPANY=co; b.disabled=false; b.textContent="회사 정보 저장"; toast("회사 정보를 저장했습니다");
